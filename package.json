@@ -1,0 +1,16 @@
+{
+  "name": "caido-wordsmith",
+  "version": "0.1.0",
+  "description": "Security testing wordlist generator for Caido",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter caido-wordsmith-backend build && pnpm --filter caido-wordsmith-frontend build",
+    "dev": "pnpm --filter caido-wordsmith-backend build --watch & pnpm --filter caido-wordsmith-frontend build --watch",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.3",
+    "vite": "^5.2.7"
+  }
+}
