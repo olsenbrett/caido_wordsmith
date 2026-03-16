@@ -9,20 +9,37 @@ import { validateOptions, DEFAULT_PREVIEW_LIMIT } from "./generator/common.js";
 import { generateCharset, estimateCharsetCount } from "./generator/charset.js";
 import { generateMask, estimateMaskCount } from "./generator/mask.js";
 import { generateMangle, estimateMangleCount } from "./generator/mangle.js";
+import { generateSegment, estimateSegmentCount } from "./generator/segment.js";
+import { generateRegex, estimateRegexCount } from "./generator/regex.js";
+import { applyEncoding } from "./encode.js";
 import { writeWordlistFile, getPreviewEntries, getOutputDir } from "./output.js";
 
 // Module-level cancel flag shared across all generators
 const cancelFlag = { cancelled: false };
 
 function getGenerator(options: GenerateOptions): Generator<string> {
+  const encoding = options.encoding ?? "none";
+  let raw: Generator<string>;
+
   switch (options.mode) {
     case "charset":
-      return generateCharset(options, cancelFlag);
+      raw = generateCharset(options, cancelFlag);
+      break;
     case "mask":
-      return generateMask(options, cancelFlag);
+      raw = generateMask(options, cancelFlag);
+      break;
     case "mangle":
-      return generateMangle(options, cancelFlag);
+      raw = generateMangle(options, cancelFlag);
+      break;
+    case "segment":
+      raw = generateSegment(options, cancelFlag);
+      break;
+    case "regex":
+      raw = generateRegex(options, cancelFlag);
+      break;
   }
+
+  return applyEncoding(raw, encoding);
 }
 
 function getEstimatedTotal(options: GenerateOptions): number {
@@ -33,6 +50,10 @@ function getEstimatedTotal(options: GenerateOptions): number {
       return estimateMaskCount(options);
     case "mangle":
       return estimateMangleCount(options);
+    case "segment":
+      return estimateSegmentCount(options);
+    case "regex":
+      return estimateRegexCount(options);
   }
 }
 
@@ -81,7 +102,6 @@ export function init(sdk: SDK<API, BackendEvents>) {
     const { path, count } = await writeWordlistFile(
       getGenerator(options),
       (processed) => {
-        // Use the outer sdk (from init) to send typed events
         sdk.api.send("wordlist:progress", { processed, total: estimatedTotal });
       }
     );

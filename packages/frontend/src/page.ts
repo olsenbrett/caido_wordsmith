@@ -1,5 +1,5 @@
 import type { CaidoSDK } from "./index.js";
-import type { GenerateOptions } from "caido-wordsmith-backend";
+import type { GenerateOptions, SegmentDef, SegmentType } from "caido-wordsmith-backend";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -17,15 +17,21 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return elem;
 }
 
-// ─── Mode-specific option builders ───────────────────────────────────────────
+function mkCheckbox(id: string, label: string): { wrap: HTMLElement; input: HTMLInputElement } {
+  const input = el("input", { type: "checkbox", id, class: "ws-checkbox" }) as HTMLInputElement;
+  const wrap = el("label", { class: "ws-checkbox-label", for: id }, input, ` ${label}`);
+  return { wrap, input };
+}
+
+// ─── Charset Form ────────────────────────────────────────────────────────────
 
 function buildCharsetForm(): { root: HTMLElement; getOptions: () => Partial<GenerateOptions> } {
   const charsetInput = el("input", {
     type: "text",
     id: "ws-charset",
     class: "ws-input",
-    value: "abcdefghijklmnopqrstuvwxyz0123456789",
-    placeholder: "Characters to use",
+    value: "a-z0-9",
+    placeholder: "e.g. a-z, A-Z, 0-9, or literal chars like !@#",
   });
   const minLenInput = el("input", {
     type: "number",
@@ -44,13 +50,36 @@ function buildCharsetForm(): { root: HTMLElement; getOptions: () => Partial<Gene
     max: "8",
   });
 
+  // Quick-add preset buttons
+  const presets: [string, string][] = [
+    ["a-z", "a-z"],
+    ["A-Z", "A-Z"],
+    ["0-9", "0-9"],
+    ["a-zA-Z", "a-zA-Z"],
+    ["a-zA-Z0-9", "Alphanumeric"],
+    ["!@#$%^&*", "Special"],
+  ];
+
+  const presetButtons = presets.map(([value, label]) => {
+    const btn = el("button", { class: "ws-preset-btn", type: "button" }, label);
+    btn.addEventListener("click", () => {
+      const current = charsetInput.value;
+      charsetInput.value = current ? current + value : value;
+    });
+    return btn;
+  });
+
+  const clearBtn = el("button", { class: "ws-preset-btn ws-preset-btn--danger", type: "button" }, "Clear");
+  clearBtn.addEventListener("click", () => { charsetInput.value = ""; });
+
   const root = el(
     "div",
     { class: "ws-form" },
     el("div", { class: "ws-field" },
       el("label", { class: "ws-label", for: "ws-charset" }, "Character set"),
       charsetInput,
-      el("span", { class: "ws-hint" }, "All characters to brute-force from")
+      el("div", { class: "ws-preset-row" }, ...presetButtons, clearBtn),
+      el("span", { class: "ws-hint" }, "Supports range notation: a-z, A-Z, 0-9 or literal characters")
     ),
     el("div", { class: "ws-field ws-field--row" },
       el("div", { class: "ws-field" },
@@ -73,6 +102,8 @@ function buildCharsetForm(): { root: HTMLElement; getOptions: () => Partial<Gene
     }),
   };
 }
+
+// ─── Mask Form ───────────────────────────────────────────────────────────────
 
 function buildMaskForm(): { root: HTMLElement; getOptions: () => Partial<GenerateOptions> } {
   const maskInput = el("input", {
@@ -104,6 +135,8 @@ function buildMaskForm(): { root: HTMLElement; getOptions: () => Partial<Generat
   };
 }
 
+// ─── Mangle Form ─────────────────────────────────────────────────────────────
+
 function buildMangleForm(): { root: HTMLElement; getOptions: () => Partial<GenerateOptions> } {
   const wordsInput = el("textarea", {
     id: "ws-words",
@@ -113,39 +146,22 @@ function buildMangleForm(): { root: HTMLElement; getOptions: () => Partial<Gener
   }) as HTMLTextAreaElement;
 
   const prefixesInput = el("input", {
-    type: "text",
-    id: "ws-prefixes",
-    class: "ws-input",
+    type: "text", id: "ws-prefixes", class: "ws-input",
     placeholder: "Comma-separated, e.g. super,my",
   });
-
   const suffixesInput = el("input", {
-    type: "text",
-    id: "ws-suffixes",
-    class: "ws-input",
+    type: "text", id: "ws-suffixes", class: "ws-input",
     placeholder: "Comma-separated, e.g. !,123",
   });
-
   const yearsInput = el("input", {
-    type: "text",
-    id: "ws-years",
-    class: "ws-input",
+    type: "text", id: "ws-years", class: "ws-input",
     value: "2022,2023,2024,2025",
     placeholder: "Comma-separated, e.g. 2023,2024",
   });
-
   const separatorsInput = el("input", {
-    type: "text",
-    id: "ws-separators",
-    class: "ws-input",
+    type: "text", id: "ws-separators", class: "ws-input",
     placeholder: "Separators for word+sep+word, e.g. _,-",
   });
-
-  function mkCheckbox(id: string, label: string): { wrap: HTMLElement; input: HTMLInputElement } {
-    const input = el("input", { type: "checkbox", id, class: "ws-checkbox" }) as HTMLInputElement;
-    const wrap = el("label", { class: "ws-checkbox-label", for: id }, input, ` ${label}`);
-    return { wrap, input };
-  }
 
   const { wrap: capWrap, input: capInput } = mkCheckbox("ws-cap", "Capitalize");
   const { wrap: upperWrap, input: upperInput } = mkCheckbox("ws-upper", "UPPERCASE");
@@ -203,20 +219,211 @@ function buildMangleForm(): { root: HTMLElement; getOptions: () => Partial<Gener
   };
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
+// ─── Segment Form ─────────────────────────────────────────────────────────────
+
+const SEGMENT_TYPES: SegmentType[] = [
+  "digits", "lowercase", "uppercase", "alpha", "alphanumeric", "special", "custom",
+];
+
+const SEGMENT_LABELS: Record<SegmentType, string> = {
+  digits: "Digits (0-9)",
+  lowercase: "Lowercase (a-z)",
+  uppercase: "Uppercase (A-Z)",
+  alpha: "Alpha (a-zA-Z)",
+  alphanumeric: "Alphanumeric",
+  special: "Special chars",
+  custom: "Custom chars",
+};
+
+function buildSegmentForm(): { root: HTMLElement; getOptions: () => Partial<GenerateOptions> } {
+  const segmentList = el("div", { class: "ws-segment-list" });
+  const segments: Array<{ getSegment: () => SegmentDef; row: HTMLElement }> = [];
+
+  function addSegmentRow(defaults?: Partial<SegmentDef>) {
+    const typeSelect = el("select", { class: "ws-select ws-select--seg-type" }) as HTMLSelectElement;
+    for (const type of SEGMENT_TYPES) {
+      const opt = el("option", { value: type }, SEGMENT_LABELS[type]);
+      if (type === (defaults?.type ?? "digits")) opt.selected = true;
+      typeSelect.appendChild(opt);
+    }
+
+    const countInput = el("input", {
+      type: "number",
+      class: "ws-input ws-input--short",
+      value: String(defaults?.count ?? 3),
+      min: "1",
+      max: "8",
+      placeholder: "Count",
+    }) as HTMLInputElement;
+
+    const customInput = el("input", {
+      type: "text",
+      class: "ws-input ws-input--custom",
+      placeholder: "Custom chars (e.g. abc!@#)",
+      value: defaults?.customChars ?? "",
+    }) as HTMLInputElement;
+    customInput.style.display = typeSelect.value === "custom" ? "" : "none";
+
+    typeSelect.addEventListener("change", () => {
+      customInput.style.display = typeSelect.value === "custom" ? "" : "none";
+    });
+
+    const removeBtn = el("button", { class: "ws-segment-remove", type: "button" }, "×");
+    const row = el("div", { class: "ws-segment-row" },
+      typeSelect,
+      el("span", { class: "ws-segment-x" }, "×"),
+      countInput,
+      el("span", { class: "ws-segment-label" }, "chars"),
+      customInput,
+      removeBtn
+    );
+
+    removeBtn.addEventListener("click", () => {
+      const idx = segments.findIndex((s) => s.row === row);
+      if (idx !== -1) segments.splice(idx, 1);
+      row.remove();
+    });
+
+    const entry = {
+      row,
+      getSegment: (): SegmentDef => ({
+        type: typeSelect.value as SegmentType,
+        count: parseInt(countInput.value, 10) || 1,
+        customChars: typeSelect.value === "custom" ? customInput.value : undefined,
+      }),
+    };
+    segments.push(entry);
+    segmentList.appendChild(row);
+  }
+
+  // Start with two default segments
+  addSegmentRow({ type: "digits", count: 3 });
+  addSegmentRow({ type: "lowercase", count: 4 });
+
+  const addBtn = el("button", { class: "ws-btn-add-segment", type: "button" }, "+ Add segment");
+  addBtn.addEventListener("click", () => addSegmentRow());
+
+  const hint = el("div", { class: "ws-hint" },
+    "Each segment adds N characters of the chosen type. Segments are concatenated left-to-right. ",
+    "Example: 3 digits + 1 special + 4 lowercase = e.g. ",
+    el("code", {}, "123!abcd")
+  );
+
+  const root = el(
+    "div",
+    { class: "ws-form" },
+    el("div", { class: "ws-field" },
+      el("label", { class: "ws-label" }, "Segments"),
+      segmentList,
+      addBtn,
+      hint
+    )
+  );
+
+  return {
+    root,
+    getOptions: () => ({
+      segments: segments.map((s) => s.getSegment()),
+    }),
+  };
+}
+
+// ─── Regex Form ──────────────────────────────────────────────────────────────
+
+function buildRegexForm(): { root: HTMLElement; getOptions: () => Partial<GenerateOptions> } {
+  const regexInput = el("input", {
+    type: "text",
+    id: "ws-regex",
+    class: "ws-input ws-input--mono",
+    placeholder: "e.g. [A-Z]{2}\\d{4} or (foo|bar)\\d?",
+    value: "",
+  });
+
+  const quantMaxInput = el("input", {
+    type: "number",
+    id: "ws-quant-max",
+    class: "ws-input ws-input--short",
+    value: "4",
+    min: "1",
+    max: "8",
+  });
+
+  const root = el(
+    "div",
+    { class: "ws-form" },
+    el("div", { class: "ws-field" },
+      el("label", { class: "ws-label", for: "ws-regex" }, "Regex pattern"),
+      regexInput,
+      el("div", { class: "ws-hint ws-hint--tokens" },
+        el("code", {}, "[a-z]"), " class  ",
+        el("code", {}, "\\d"), " digits  ",
+        el("code", {}, "\\w"), " word  ",
+        el("code", {}, "\\l"), " lowercase  ",
+        el("code", {}, "\\u"), " uppercase  ",
+        el("code", {}, "."), " any printable  ",
+        el("code", {}, "{n,m}"), " range  ",
+        el("code", {}, "(a|b)"), " alternation"
+      )
+    ),
+    el("div", { class: "ws-field ws-field--row" },
+      el("div", { class: "ws-field" },
+        el("label", { class: "ws-label", for: "ws-quant-max" }, "Max repetitions for + / *"),
+        quantMaxInput,
+        el("span", { class: "ws-hint" }, "Caps unbounded quantifiers (+ and *) to avoid explosion")
+      )
+    )
+  );
+
+  return {
+    root,
+    getOptions: () => ({
+      regex: regexInput.value,
+      regexQuantifierMax: parseInt(quantMaxInput.value, 10) || 4,
+    }),
+  };
+}
+
+// ─── Encoding Selector ────────────────────────────────────────────────────────
+
+function buildEncodingSelector(): { root: HTMLElement; getEncoding: () => string } {
+  const select = el("select", { class: "ws-select", id: "ws-encoding" }) as HTMLSelectElement;
+  const options: [string, string][] = [
+    ["none", "No encoding"],
+    ["url", "URL encode (%xx)"],
+    ["base64", "Base64"],
+    ["hex", "Hex"],
+    ["html", "HTML entities"],
+  ];
+  for (const [value, label] of options) {
+    select.appendChild(el("option", { value }, label));
+  }
+
+  const root = el("div", { class: "ws-encoding-bar" },
+    el("label", { class: "ws-label", for: "ws-encoding" }, "Output encoding:"),
+    select
+  );
+
+  return {
+    root,
+    getEncoding: () => select.value,
+  };
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function createPage(sdk: CaidoSDK): HTMLElement {
-  type Mode = "charset" | "mask" | "mangle";
+  type Mode = "charset" | "mask" | "mangle" | "segment" | "regex";
   let currentMode: Mode = "mangle";
 
-  // Build form sections
   const charsetForm = buildCharsetForm();
   const maskForm = buildMaskForm();
   const mangleForm = buildMangleForm();
+  const segmentForm = buildSegmentForm();
+  const regexForm = buildRegexForm();
+  const encodingSelector = buildEncodingSelector();
 
   const formContainer = el("div", { class: "ws-form-container" });
 
-  // Preview / results
   const previewOutput = el("textarea", {
     class: "ws-preview-output",
     readonly: "",
@@ -227,23 +434,29 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
   const progressBar = el("progress", { class: "ws-progress", value: "0", max: "100" }) as HTMLProgressElement;
   const progressText = el("div", { class: "ws-progress-text" }, "");
   const progressSection = el("div", { class: "ws-progress-section ws-hidden" }, progressBar, progressText);
-
   const resultPanel = el("div", { class: "ws-result ws-hidden" });
-
   const errorPanel = el("div", { class: "ws-error ws-hidden" });
 
-  // Buttons
   const btnPreview = el("button", { class: "c-button c-button--primary", id: "ws-btn-preview" }, "Preview");
   const btnGenerate = el("button", { class: "c-button", id: "ws-btn-generate" }, "Generate file");
   const btnCancel = el("button", { class: "c-button ws-hidden", id: "ws-btn-cancel" }, "Cancel");
 
-  // ── Mode switch ──────────────────────────────────────────────────────────
+  // ── Tabs ──────────────────────────────────────────────────────────────────
 
-  const tabButtons: Record<Mode, HTMLButtonElement> = {
-    charset: el("button", { class: "ws-tab", "data-mode": "charset" }, "Charset") as HTMLButtonElement,
-    mask: el("button", { class: "ws-tab", "data-mode": "mask" }, "Mask") as HTMLButtonElement,
-    mangle: el("button", { class: "ws-tab ws-tab--active", "data-mode": "mangle" }, "Mangle") as HTMLButtonElement,
-  };
+  const tabDefs: [Mode, string][] = [
+    ["charset", "Charset"],
+    ["mask", "Mask"],
+    ["mangle", "Mangle"],
+    ["segment", "Segments"],
+    ["regex", "Regex"],
+  ];
+
+  const tabButtons = Object.fromEntries(
+    tabDefs.map(([mode, label]) => [
+      mode,
+      el("button", { class: "ws-tab", "data-mode": mode }, label) as HTMLButtonElement,
+    ])
+  ) as Record<Mode, HTMLButtonElement>;
 
   function switchMode(mode: Mode) {
     currentMode = mode;
@@ -255,6 +468,8 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
       case "charset": formContainer.appendChild(charsetForm.root); break;
       case "mask": formContainer.appendChild(maskForm.root); break;
       case "mangle": formContainer.appendChild(mangleForm.root); break;
+      case "segment": formContainer.appendChild(segmentForm.root); break;
+      case "regex": formContainer.appendChild(regexForm.root); break;
     }
   }
 
@@ -262,7 +477,7 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
     btn.addEventListener("click", () => switchMode(mode));
   }
 
-  // ── Collect options ──────────────────────────────────────────────────────
+  // ── Collect options ───────────────────────────────────────────────────────
 
   function collectOptions(previewLimit?: number): GenerateOptions {
     let modeOptions: Partial<GenerateOptions> = {};
@@ -270,11 +485,14 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
       case "charset": modeOptions = charsetForm.getOptions(); break;
       case "mask": modeOptions = maskForm.getOptions(); break;
       case "mangle": modeOptions = mangleForm.getOptions(); break;
+      case "segment": modeOptions = segmentForm.getOptions(); break;
+      case "regex": modeOptions = regexForm.getOptions(); break;
     }
-    return { mode: currentMode, previewLimit, ...modeOptions };
+    const encoding = encodingSelector.getEncoding() as GenerateOptions["encoding"];
+    return { mode: currentMode, previewLimit, encoding, ...modeOptions };
   }
 
-  // ── Show / hide helpers ──────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   function showError(msg: string) {
     errorPanel.textContent = msg;
@@ -287,12 +505,12 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
   }
 
   function setLoading(loading: boolean) {
-    btnPreview.disabled = loading;
-    btnGenerate.disabled = loading;
+    (btnPreview as HTMLButtonElement).disabled = loading;
+    (btnGenerate as HTMLButtonElement).disabled = loading;
     btnCancel.classList.toggle("ws-hidden", !loading);
   }
 
-  // ── Preview ──────────────────────────────────────────────────────────────
+  // ── Preview ───────────────────────────────────────────────────────────────
 
   btnPreview.addEventListener("click", async () => {
     clearError();
@@ -305,9 +523,10 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
       const opts = collectOptions(100);
       const result = await sdk.backend.previewWordlist(opts);
       previewOutput.value = result.preview.join("\n");
-      const est = result.estimatedTotal > result.previewCount
-        ? ` (estimated total: ${result.estimatedTotal.toLocaleString()})`
-        : "";
+      const est =
+        result.estimatedTotal > 0 && result.estimatedTotal > result.previewCount
+          ? ` (estimated total: ${result.estimatedTotal.toLocaleString()})`
+          : "";
       previewMeta.textContent = `Showing ${result.previewCount} entries${est} — ${result.durationMs}ms`;
     } catch (err) {
       showError(`Preview failed: ${(err as Error).message}`);
@@ -317,7 +536,7 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
     }
   });
 
-  // ── Generate ─────────────────────────────────────────────────────────────
+  // ── Generate ──────────────────────────────────────────────────────────────
 
   btnGenerate.addEventListener("click", async () => {
     clearError();
@@ -349,14 +568,14 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
     }
   });
 
-  // ── Cancel ───────────────────────────────────────────────────────────────
+  // ── Cancel ────────────────────────────────────────────────────────────────
 
   btnCancel.addEventListener("click", async () => {
     await sdk.backend.cancelGeneration();
     progressText.textContent = "Cancelling…";
   });
 
-  // ── Progress events ──────────────────────────────────────────────────────
+  // ── Progress events ───────────────────────────────────────────────────────
 
   sdk.backend.onEvent("wordlist:progress", ({ processed, total }) => {
     if (total > 0) {
@@ -369,7 +588,7 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
     }
   });
 
-  // ── Assemble page ────────────────────────────────────────────────────────
+  // ── Assemble ──────────────────────────────────────────────────────────────
 
   switchMode(currentMode);
 
@@ -380,8 +599,11 @@ export function createPage(sdk: CaidoSDK): HTMLElement {
       el("h2", { class: "ws-title" }, "Wordsmith"),
       el("p", { class: "ws-subtitle" }, "Generate security testing wordlists for Caido Automate")
     ),
-    el("div", { class: "ws-tabs" }, tabButtons.charset, tabButtons.mask, tabButtons.mangle),
+    el("div", { class: "ws-tabs" },
+      ...tabDefs.map(([mode]) => tabButtons[mode])
+    ),
     formContainer,
+    encodingSelector.root,
     el("div", { class: "ws-actions" }, btnPreview, btnGenerate, btnCancel),
     errorPanel,
     el("div", { class: "ws-preview" },

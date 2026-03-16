@@ -1,4 +1,21 @@
-export type GenerateMode = "charset" | "mask" | "mangle";
+export type GenerateMode = "charset" | "mask" | "mangle" | "segment" | "regex";
+
+export type SegmentType =
+  | "lowercase"
+  | "uppercase"
+  | "digits"
+  | "special"
+  | "alphanumeric"
+  | "alpha"
+  | "custom";
+
+export type SegmentDef = {
+  type: SegmentType;
+  count: number;
+  customChars?: string; // only when type === "custom"
+};
+
+export type EncodingType = "none" | "url" | "base64" | "hex" | "html";
 
 export type GenerateOptions = {
   mode: GenerateMode;
@@ -18,9 +35,15 @@ export type GenerateOptions = {
   uppercase?: boolean;
   lowercase?: boolean;
   leetspeak?: boolean;
+  // Segment mode
+  segments?: SegmentDef[];
+  // Regex mode
+  regex?: string;
+  regexQuantifierMax?: number;
   // Common
   dedupe?: boolean;
   previewLimit?: number;
+  encoding?: EncodingType;
 };
 
 export type PreviewResult = {
@@ -41,7 +64,8 @@ export const DEFAULT_PREVIEW_LIMIT = 100;
 export const MAX_ENTRIES = 10_000_000;
 
 export function validateOptions(options: GenerateOptions): string | null {
-  if (!["charset", "mask", "mangle"].includes(options.mode)) {
+  const validModes: GenerateMode[] = ["charset", "mask", "mangle", "segment", "regex"];
+  if (!validModes.includes(options.mode)) {
     return `Unknown mode: ${options.mode}`;
   }
   if (options.mode === "charset") {
@@ -63,6 +87,19 @@ export function validateOptions(options: GenerateOptions): string | null {
   }
   if (options.mode === "mangle") {
     if (!options.words || options.words.length === 0) return "At least one word is required for mangle mode";
+  }
+  if (options.mode === "segment") {
+    if (!options.segments || options.segments.length === 0) return "At least one segment is required";
+    for (const seg of options.segments) {
+      if (seg.count < 1) return "Each segment count must be at least 1";
+      if (seg.count > 8) return "Segment count must be <= 8 to avoid combinatorial explosion";
+      if (seg.type === "custom" && (!seg.customChars || seg.customChars.length === 0)) {
+        return "Custom segment requires customChars to be set";
+      }
+    }
+  }
+  if (options.mode === "regex") {
+    if (!options.regex || options.regex.trim() === "") return "Regex pattern must not be empty";
   }
   return null;
 }

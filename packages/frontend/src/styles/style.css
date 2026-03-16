@@ -292,6 +292,136 @@
   border-left: 3px solid var(--color-border, #4a5568);
 }
 
+/* Encoding bar */
+.ws-encoding-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--color-surface, #1a202c);
+  border: 1px solid var(--color-border, #2d3748);
+  border-radius: 6px;
+}
+
+.ws-select {
+  padding: 6px 10px;
+  background: var(--color-input-bg, #2d3748);
+  border: 1px solid var(--color-border, #4a5568);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ws-select:focus {
+  outline: none;
+  border-color: var(--color-primary, #63b3ed);
+}
+
+/* Preset buttons (charset quick-add) */
+.ws-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ws-preset-btn {
+  padding: 3px 9px;
+  background: var(--color-input-bg, #2d3748);
+  border: 1px solid var(--color-border, #4a5568);
+  border-radius: 3px;
+  color: inherit;
+  font-size: 0.78rem;
+  font-family: monospace;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ws-preset-btn:hover {
+  border-color: var(--color-primary, #63b3ed);
+  background: var(--color-surface, #1a202c);
+}
+
+.ws-preset-btn--danger:hover {
+  border-color: var(--color-error, #fc8181);
+}
+
+/* Segment builder */
+.ws-segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ws-segment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ws-select--seg-type {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ws-segment-x {
+  opacity: 0.45;
+  font-size: 0.8rem;
+  user-select: none;
+}
+
+.ws-segment-label {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.ws-input--custom {
+  flex: 2;
+  min-width: 120px;
+}
+
+.ws-segment-remove {
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--color-border, #4a5568);
+  border-radius: 3px;
+  color: var(--color-text-muted, #a0aec0);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ws-segment-remove:hover {
+  color: var(--color-error, #fc8181);
+  border-color: var(--color-error, #fc8181);
+}
+
+.ws-btn-add-segment {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px dashed var(--color-border, #4a5568);
+  border-radius: 4px;
+  color: var(--color-primary, #63b3ed);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  align-self: flex-start;
+}
+
+.ws-btn-add-segment:hover {
+  border-color: var(--color-primary, #63b3ed);
+}
+
+/* Monospace input */
+.ws-input--mono {
+  font-family: monospace;
+}
+
 /* Utility */
 .ws-hidden {
   display: none !important;
