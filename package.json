@@ -7,7 +7,8 @@
   "scripts": {
     "build": "pnpm --filter caido-wordsmith-backend build && pnpm --filter caido-wordsmith-frontend build",
     "dev": "pnpm --filter caido-wordsmith-backend build --watch & pnpm --filter caido-wordsmith-frontend build --watch",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "package": "pnpm build && cp manifest.json dist/ && cd dist && zip -r ../plugin_package.zip . && echo 'Created plugin_package.zip'"
   },
   "devDependencies": {
     "typescript": "^5.4.3",
