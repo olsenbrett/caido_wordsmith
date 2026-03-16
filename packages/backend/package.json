@@ -1,0 +1,17 @@
+{
+  "name": "caido-wordsmith-backend",
+  "version": "0.1.0",
+  "description": "Caido Wordsmith backend plugin",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@caido/sdk-backend": "^0.41.0",
+    "typescript": "^5.4.3",
+    "vite": "^5.2.7"
+  }
+}

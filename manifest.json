@@ -1,0 +1,28 @@
+{
+  "id": "caido-wordsmith",
+  "name": "Caido Wordsmith",
+  "version": "0.1.0",
+  "description": "Security testing wordlist generator — brute-force charset, mask-based, and word-mangling payload generation for Caido Automate.",
+  "author": {
+    "name": "Caido Wordsmith",
+    "email": "",
+    "url": ""
+  },
+  "plugins": [
+    {
+      "kind": "frontend",
+      "id": "caido-wordsmith-frontend",
+      "name": "Caido Wordsmith Frontend",
+      "entrypoint": "frontend/script.js",
+      "style": "frontend/style.css",
+      "backend": { "id": "caido-wordsmith-backend" }
+    },
+    {
+      "kind": "backend",
+      "id": "caido-wordsmith-backend",
+      "name": "Caido Wordsmith Backend",
+      "runtime": "javascript",
+      "entrypoint": "backend/script.js"
+    }
+  ]
+}
