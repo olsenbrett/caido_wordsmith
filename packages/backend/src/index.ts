@@ -9,30 +9,38 @@ import { validateOptions, DEFAULT_PREVIEW_LIMIT } from "./generator/common.js";
 import { generateCharset, estimateCharsetCount } from "./generator/charset.js";
 import { generateMask, estimateMaskCount } from "./generator/mask.js";
 import { generateMangle, estimateMangleCount } from "./generator/mangle.js";
-import { writeWordlistFile, getPreviewEntries, getOutputDir } from "./output.js";
+import { generateNumbers, estimateNumbersCount } from "./generator/numbers.js";
+import { generateDates, estimateDatesCount } from "./generator/dates.js";
+import { generateNull, estimateNullCount } from "./generator/nullpayloads.js";
+import { generateCharBlocks, estimateCharBlocksCount } from "./generator/charblocks.js";
+import { generateUsernames, estimateUsernamesCount } from "./generator/usernames.js";
+import { writeWordlistFile, getPreviewEntries } from "./output.js";
 
-// Module-level cancel flag shared across all generators
 const cancelFlag = { cancelled: false };
 
 function getGenerator(options: GenerateOptions): Generator<string> {
   switch (options.mode) {
-    case "charset":
-      return generateCharset(options, cancelFlag);
-    case "mask":
-      return generateMask(options, cancelFlag);
-    case "mangle":
-      return generateMangle(options, cancelFlag);
+    case "charset":    return generateCharset(options, cancelFlag);
+    case "mask":       return generateMask(options, cancelFlag);
+    case "mangle":     return generateMangle(options, cancelFlag);
+    case "numbers":    return generateNumbers(options, cancelFlag);
+    case "dates":      return generateDates(options, cancelFlag);
+    case "null":       return generateNull(options, cancelFlag);
+    case "charblocks": return generateCharBlocks(options, cancelFlag);
+    case "usernames":  return generateUsernames(options, cancelFlag);
   }
 }
 
 function getEstimatedTotal(options: GenerateOptions): number {
   switch (options.mode) {
-    case "charset":
-      return estimateCharsetCount(options);
-    case "mask":
-      return estimateMaskCount(options);
-    case "mangle":
-      return estimateMangleCount(options);
+    case "charset":    return estimateCharsetCount(options);
+    case "mask":       return estimateMaskCount(options);
+    case "mangle":     return estimateMangleCount(options);
+    case "numbers":    return estimateNumbersCount(options);
+    case "dates":      return estimateDatesCount(options);
+    case "null":       return estimateNullCount(options);
+    case "charblocks": return estimateCharBlocksCount(options);
+    case "usernames":  return estimateUsernamesCount(options);
   }
 }
 
@@ -40,7 +48,6 @@ export type API = DefineAPI<{
   previewWordlist: (sdk: SDK, options: GenerateOptions) => Promise<PreviewResult>;
   generateWordlist: (sdk: SDK, options: GenerateOptions) => Promise<GenerateResult>;
   cancelGeneration: (sdk: SDK) => void;
-  getOutputDirectory: (sdk: SDK) => string;
 }>;
 
 export type BackendEvents = DefineEvents<{
@@ -57,8 +64,7 @@ export function init(sdk: SDK<API, BackendEvents>) {
     const estimatedTotal = getEstimatedTotal(options);
 
     cancelFlag.cancelled = false;
-    const gen = getGenerator(options);
-    const entries = getPreviewEntries(gen, limit);
+    const entries = getPreviewEntries(getGenerator(options), limit, options);
 
     return {
       preview: entries,
@@ -79,9 +85,10 @@ export function init(sdk: SDK<API, BackendEvents>) {
     cancelFlag.cancelled = false;
 
     const { path, count } = await writeWordlistFile(
+      sdk,
       getGenerator(options),
+      options,
       (processed) => {
-        // Use the outer sdk (from init) to send typed events
         sdk.api.send("wordlist:progress", { processed, total: estimatedTotal });
       }
     );
@@ -95,9 +102,5 @@ export function init(sdk: SDK<API, BackendEvents>) {
 
   sdk.api.register("cancelGeneration", (_rpcSdk: SDK): void => {
     cancelFlag.cancelled = true;
-  });
-
-  sdk.api.register("getOutputDirectory", (_rpcSdk: SDK): string => {
-    return getOutputDir();
   });
 }

@@ -4,9 +4,8 @@
   "version": "0.1.0",
   "description": "Security testing wordlist generator — brute-force charset, mask-based, and word-mangling payload generation for Caido Automate.",
   "author": {
-    "name": "Caido Wordsmith",
-    "email": "",
-    "url": ""
+    "name": "brettolsen",
+    "url": "https://github.com/olsenbrett/caido_wordsmith"
   },
   "plugins": [
     {

@@ -1,68 +1,50 @@
-import { mkdir, writeFile, open } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import type { GenerateOptions } from "./generator/common.js";
+import { applyProcessingRules } from "./generator/processing.js";
 
-const OUTPUT_DIR = join(tmpdir(), "caido-wordsmith");
+type MinimalSDK = {
+  hostedFile: {
+    create(spec: { name: string; content: string }): Promise<{ path: string; name: string; id: string }>;
+  };
+};
 
-export async function ensureOutputDir(): Promise<void> {
-  await mkdir(OUTPUT_DIR, { recursive: true });
-}
-
-export function getOutputDir(): string {
-  return OUTPUT_DIR;
+function process(entry: string, options: GenerateOptions): string {
+  const rules = options.processing ?? [];
+  return rules.length > 0 ? applyProcessingRules(entry, rules) : entry;
 }
 
 export async function writeWordlistFile(
+  sdk: MinimalSDK,
   generator: Generator<string>,
+  options: GenerateOptions,
   onProgress: (processed: number) => void
 ): Promise<{ path: string; count: number }> {
-  await ensureOutputDir();
   const filename = `wordlist-${Date.now()}.txt`;
-  const filepath = join(OUTPUT_DIR, filename);
-
-  const fileHandle = await open(filepath, "w");
-  const writeStream = fileHandle.createWriteStream();
-
+  const lines: string[] = [];
   let count = 0;
-  let buffer = "";
-  const FLUSH_SIZE = 1000;
 
-  try {
-    for (const entry of generator) {
-      buffer += entry + "\n";
-      count++;
-      if (count % FLUSH_SIZE === 0) {
-        await new Promise<void>((resolve, reject) => {
-          writeStream.write(buffer, (err) => (err ? reject(err) : resolve()));
-        });
-        buffer = "";
-        onProgress(count);
-      }
+  for (const entry of generator) {
+    lines.push(process(entry, options));
+    count++;
+    if (count % 1000 === 0) {
+      onProgress(count);
     }
-    // Flush remaining
-    if (buffer) {
-      await new Promise<void>((resolve, reject) => {
-        writeStream.write(buffer, (err) => (err ? reject(err) : resolve()));
-      });
-    }
-    onProgress(count);
-  } finally {
-    await new Promise<void>((resolve, reject) => {
-      writeStream.end((err?: Error | null) => (err ? reject(err) : resolve()));
-    });
-    await fileHandle.close();
   }
+  onProgress(count);
 
-  return { path: filepath, count };
+  const content = lines.join("\n") + (lines.length > 0 ? "\n" : "");
+  const file = await sdk.hostedFile.create({ name: filename, content });
+
+  return { path: file.path, count };
 }
 
 export function getPreviewEntries(
   generator: Generator<string>,
-  limit: number
+  limit: number,
+  options: GenerateOptions
 ): string[] {
   const entries: string[] = [];
   for (const entry of generator) {
-    entries.push(entry);
+    entries.push(process(entry, options));
     if (entries.length >= limit) break;
   }
   return entries;
